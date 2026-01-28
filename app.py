@@ -5,25 +5,22 @@ import yfinance as yf
 import re
 
 # 1. 页面配置
-st.set_page_config(page_title="AI 逻辑驱动投资终端", layout="wide")
+st.set_page_config(page_title="Gemini 选股笔记：深度分析模式", layout="wide")
 
-# 2. 注入更具“极客感”的研报样式
+# 2. 注入“深度对话”感样式
 st.markdown("""
     <style>
-    .ai-box { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #2196F3; margin-bottom: 20px; line-height: 1.6; }
-    .report-card { background-color: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-top: 4px solid #4CAF50; text-align: center; }
-    .section-title { color: #1a237e; font-size: 24px; font-weight: bold; margin: 30px 0 15px 0; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
-    .recommend-card { background-color: #f1f8e9; padding: 20px; border-radius: 10px; border: 1px solid #c8e6c9; height: 100%; }
-    .status-tag { background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .ai-chat-box { background-color: #f4f7f9; padding: 25px; border-radius: 15px; border-left: 6px solid #1a73e8; margin-bottom: 30px; }
+    .logic-header { color: #1a73e8; font-size: 20px; font-weight: bold; margin-bottom: 10px; }
+    .analysis-text { line-height: 1.8; font-size: 16px; color: #3c4043; }
+    .stat-pill { background: #e8f0fe; color: #1967d2; padding: 4px 12px; border-radius: 20px; font-size: 13px; margin-right: 10px; font-weight: bold; }
+    .recommend-card { background-color: #ffffff; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); height: 100%; border-top: 5px solid #34a853; }
     </style>
     """, unsafe_allow_html=True)
 
-# 智能中文名清洗引擎
 def get_clean_name(info, symbol):
     raw = info.get('longName', info.get('shortName', symbol))
-    # 移除英文杂质
     clean = re.sub(r"(?i)(Co\.,\s*Ltd\.|Group|Inc\.|Corp\.|Holdings|A-Shares|Class A)", "", raw)
-    # 提取中文
     cn = "".join(re.findall(r'[\u4e00-\u9fa5]+', clean))
     return cn if cn else clean.strip()
 
@@ -35,16 +32,12 @@ def get_pro_data(code):
     try:
         stock = yf.Ticker(symbol_yf)
         info = stock.info
-        
-        # 核心财务抓取
         pe = info.get('trailingPE', 0)
         roe = info.get('returnOnEquity', 0) * 100
         margin = info.get('grossMargins', 0) * 100
         growth = info.get('revenueGrowth', 0) * 100
         debt = info.get('debtToEquity', 0)
-        fcf = info.get('freeCashflow', 0) / 1e8 # 亿为单位
-
-        # 归一化评分 (1-10)
+        
         scores = [
             max(1, min(10, 50/pe*5 if pe > 0 else 2)),
             max(1, min(10, roe/3)),
@@ -52,95 +45,86 @@ def get_pro_data(code):
             max(1, min(10, 10 - debt/25)),
             max(1, min(10, growth*8))
         ]
-        
         return {
             "name": get_clean_name(info, symbol), "code": symbol, "pe": pe, "roe": roe,
-            "margin": margin, "growth": growth, "debt": debt, "fcf": fcf, "scores": scores
+            "margin": margin, "growth": growth, "debt": debt, "scores": scores
         }
     except: return None
 
-# --- 本地专家分析引擎 (模拟 AI) ---
-def expert_ai_analysis(r):
-    insights = []
-    # 1. 盈利逻辑分析
-    if r['roe'] > 20: insights.append(f"该股 ROE 高达 {r['roe']:.1f}%，展现出极强的垄断性或品牌溢价能力。")
-    elif r['roe'] > 10: insights.append(f"盈利能力处于行业中上游，经营效率稳健。")
-    else: insights.append(f"当前 ROE 为 {r['roe']:.1f}%，盈利能力需警惕，关注是否处于行业低谷。")
-    
-    # 2. 财务风险分析
-    if r['debt'] > 80: insights.append(f"负债率偏高（{r['debt']:.1f}%），AI 提示关注其利息覆盖倍数及资金链安全。")
-    else: insights.append(f"财务杠杆控制优异，自由现金流（{r['fcf']:.1f}亿）说明生意成色较好。")
-    
-    # 3. 估值决策
-    if r['pe'] > 40: insights.append("当前估值倍数较高，市场已透支未来成长预期，不建议盲目追高。")
-    elif r['pe'] < 15: insights.append("市盈率极具吸引力，若基本面无恶化，属于典型的‘价值捡漏’区间。")
-    
-    return " ".join(insights)
+# --- 对话式 AI 深度分析引擎 ---
+def ai_conversational_analysis(r):
+    # 核心观点：模拟 Gemini 的理性点评
+    if r['roe'] > 20 and r['margin'] > 30:
+        conclusion = f"这家公司的生意模式非常硬。{r['margin']:.1f}% 的毛利和 {r['roe']:.1f}% 的 ROE 意味着它在产业链中有绝对的话语权，属于典型的‘躺赚’型企业。"
+    elif r['roe'] > 12:
+        conclusion = f"盈利能力属于‘优等生’范畴，经营效率不错。但考虑到目前营收增速为 {r['growth']:.1f}%，它更偏向于‘稳健收息’而非‘爆发增长’。"
+    else:
+        conclusion = "财务指标显示其正面临一定的压力。盈利能力跌破 10%，意味着它可能正在经历行业阵痛期，或者护城河正在变窄，需要谨慎。"
 
-# 3. 交互界面
-st.title("🛡️ 专家级·理性选股决策终端")
-st.caption("基于本地专家推理引擎，实时解析企业核心财报指标")
+    # 风险直击
+    risk_text = "估值（PE）高达 {:.1f}，现在的价格已经透支了未来的预期，短期赔率不高。".format(r['pe']) if r['pe'] > 35 else "目前的估值水平处于合理区间，向下空间有限，安全边际比较厚。"
+    
+    return conclusion, risk_text
 
-codes_input = st.sidebar.text_input("输入自选代码 (如: 600519, 002028, 600309)", "600519, 002028, 600309")
+# 3. 界面展示
+st.title("🤖 Gemini 深度投资决策助手")
+st.markdown("---")
 
-if st.sidebar.button("启动深度逻辑分析"):
-    codes = [c.strip() for c in codes_input.split(',')]
+user_input = st.sidebar.text_input("输入自选代码 (如: 600519, 002028)", "600519, 002028")
+
+if st.sidebar.button("启动深度对话分析"):
+    codes = [c.strip() for c in user_input.split(',')]
     results = [get_pro_data(c) for c in codes if get_pro_data(c)]
     
     if results:
-        # 第一模块：公司画像
-        st.markdown('<div class="section-title">1. 公司画像与竞争力标签</div>', unsafe_allow_html=True)
-        cols = st.columns(len(results))
-        for i, r in enumerate(results):
-            with cols[i]:
-                st.markdown(f"""
-                <div class="report-card">
-                    <span class="status-tag">实时监控中</span>
-                    <h3 style="margin-top:10px;">{r['name']}</h3>
-                    <p style="color:#666; font-size:14px;">{r['code']}</p>
-                    <div style="font-weight:bold; color:#2e7d32;">毛利: {r['margin']:.1f}%</div>
+        # 第一模块：核心观点直达 (取代原本的表格/画像)
+        st.subheader("💡 AI 深度点评")
+        for r in results:
+            conclusion, risk = ai_conversational_analysis(r)
+            st.markdown(f"""
+            <div class="ai-chat-box">
+                <div class="logic-header">关于 {r['name']} ({r['code']}) 的分析结论：</div>
+                <div class="analysis-text">
+                    <span class="stat-pill">ROE: {r['roe']:.1f}%</span>
+                    <span class="stat-pill">PE: {r['pe']:.1f}</span>
+                    <span class="stat-pill">毛利: {r['margin']:.1f}%</span>
+                    <br/><br/>
+                    <b>我的核心观察：</b>{conclusion}<br/><br/>
+                    <b>关于风险，我认为：</b>{risk}
                 </div>
-                """, unsafe_allow_html=True)
+            </div>
+            """, unsafe_allow_html=True)
 
-        # 第二模块：深度对比分析
-        st.markdown('<div class="section-title">2. 深度逻辑剖析（本地专家系统）</div>', unsafe_allow_html=True)
-        col_chart, col_text = st.columns([1, 1.2])
-        
+        # 第二模块：多维体质对比
+        st.subheader("📊 综合体质雷达图")
+        col_chart, col_empty = st.columns([1.5, 1])
         with col_chart:
             categories = ['便宜程度', '赚钱底气', '回本快慢', '抗跌能力', '增长潜力']
             fig = go.Figure()
             for r in results:
                 fig.add_trace(go.Scatterpolar(r=r['scores'], theta=categories, fill='toself', name=r['name']))
-            fig.update_layout(polar=dict(radialaxis=dict(visible=False, range=[0, 10])), height=450)
+            fig.update_layout(polar=dict(radialaxis=dict(visible=False, range=[0, 10])), height=500)
             st.plotly_chart(fig, use_container_width=True)
             
-            
-        with col_text:
-            for r in results:
-                st.markdown(f"**{r['name']} 实时分析结论：**")
-                st.markdown(f"""<div class="ai-box">
-                <b>深度透视：</b>{expert_ai_analysis(r)}<br/>
-                <b>增长预测：</b>营收预期增长 {r['growth']:.1f}%，需对比行业均值判断其份额变化。
-                </div>""", unsafe_allow_html=True)
 
-        # 第三模块：理性配置建议
-        st.markdown('<div class="section-title">3. 理性配置决策（基于画像匹配）</div>', unsafe_allow_html=True)
+        # 第三模块：理性决策矩阵
+        st.subheader("⚖️ 最终决策建议")
         c1, c2, c3 = st.columns(3)
         best_v = sorted(results, key=lambda x: x['scores'][0], reverse=True)[0]
         best_g = sorted(results, key=lambda x: x['scores'][4], reverse=True)[0]
         best_s = sorted(results, key=lambda x: x['roe'], reverse=True)[0]
 
         with c1:
-            st.markdown(f"""<div class="recommend-card"><b>💎 价值挖掘型：</b><br/><br/>
-            推荐：<b>{best_v['name']}</b><br/>
-            理由：PE仅 {best_v['pe']:.1f}，在当前组合中估值最亲民，具备较高的安全边际。</div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="recommend-card"><b>💎 价值挖掘</b><br/><br/>
+            <b>首选：{best_v['name']}</b><br/>
+            理由：它是目前组合中最便宜的选择，如果你追求‘低价买好货’，它最合适。</div>""", unsafe_allow_html=True)
         with c2:
-            st.markdown(f"""<div class="recommend-card"><b>🚀 爆发成长型：</b><br/><br/>
-            推荐：<b>{best_g['name']}</b><br/>
-            理由：营收增速达 {best_g['growth']:.1f}%，虽波动可能较大，但属于典型的进取型标的。</div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="recommend-card"><b>🚀 成长进取</b><br/><br/>
+            <b>首选：{best_g['name']}</b><br/>
+            理由：虽然有波动，但它的扩张速度最快。适合愿意用时间换取爆发空间的投资者。</div>""", unsafe_allow_html=True)
         with c3:
-            st.markdown(f"""<div class="recommend-card"><b>🛡️ 优质白马型：</b><br/><br/>
-            推荐：<b>{best_s['name']}</b><br/>
-            理由：ROE 高达 {best_s['roe']:.1f}%，生意模式优越，是长线持股的首选。</div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="recommend-card"><b>🛡️ 稳健长线</b><br/><br/>
+            <b>首选：{best_s['name']}</b><br/>
+            理由：它是这个组合里的‘现金奶牛’。ROE 表现卓越，适合追求确定性的长线底仓。</div>""", unsafe_allow_html=True)
     else:
-        st.error("数据调取失败，请检查代码输入是否为 6 位数字代码。")
+        st.error("数据调取失败。")
