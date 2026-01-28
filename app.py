@@ -18,7 +18,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🍎 选股“照妖镜”：大白话深度对比")
+st.title("🍎 股票pk台：哪只股票更值得买？")
 
 def get_pro_analysis(code):
     symbol = code.strip()
@@ -101,7 +101,7 @@ if st.sidebar.button("开始大白话分析"):
         st.plotly_chart(fig, use_container_width=True)
 
         # 第二部分：个性化建议卡片
-        st.subheader("💡 老师傅的真心话建议")
+        st.subheader("💡 老师傅的建议")
         for r in results:
             st.markdown(f"""
             <div class="status-card">
