@@ -5,19 +5,36 @@ import pandas as pd
 import plotly.graph_objects as go
 import re
 
-# --- 1. 核心安全配置：从 Secrets 读取 API KEY ---
+# --- 1. 核心安全配置：动态模型匹配 ---
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     
-    # 修复 404 错误的关键：使用全名或 latest 后缀
-    # gemini-1.5-flash-latest 是目前最稳定的指向
-    model = genai.GenerativeModel(model_name='gemini-1.5-flash-latest')
+    # 动态获取可用模型列表，避免 404
+    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     
-    # 测试一下连接（可选）
-    # response = model.generate_content("test") 
+    # 按照优先级排序寻找可用模型
+    target_models = [
+        'models/gemini-1.5-flash', 
+        'models/gemini-1.5-pro', 
+        'models/gemini-1.0-pro'
+    ]
+    
+    selected_model = None
+    for target in target_models:
+        if target in available_models:
+            selected_model = target
+            break
+            
+    if not selected_model:
+        selected_model = available_models[0] # 保底选择第一个可用的
+        
+    model = genai.GenerativeModel(model_name=selected_model)
+    st.sidebar.success(f"已连接 AI 大脑: {selected_model}")
+
 except Exception as e:
     st.error(f"❌ AI 配置异常: {str(e)}")
+    st.info("请检查 API Key 是否正确，或网络是否可以访问 Google API。")
     st.stop()
 
 # --- 2. 页面美化配置 ---
