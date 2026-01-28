@@ -3,151 +3,136 @@ import yfinance as yf
 import google.generativeai as genai
 import pandas as pd
 import plotly.graph_objects as go
+import json
 import re
 
-# --- 1. 核心安全配置：动态模型匹配 ---
+# --- 1. AI 配置与动态模型选择 ---
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
-    
-    # 动态获取可用模型列表，避免 404
+    # 动态匹配模型
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    
-    # 按照优先级排序寻找可用模型
-    target_models = [
-        'models/gemini-1.5-flash', 
-        'models/gemini-1.5-pro', 
-        'models/gemini-1.0-pro'
-    ]
-    
-    selected_model = None
-    for target in target_models:
-        if target in available_models:
-            selected_model = target
-            break
-            
-    if not selected_model:
-        selected_model = available_models[0] # 保底选择第一个可用的
-        
-    model = genai.GenerativeModel(model_name=selected_model)
-    st.sidebar.success(f"已连接 AI 大脑: {selected_model}")
-
+    model_path = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in available_models else available_models[0]
+    model = genai.GenerativeModel(model_path)
 except Exception as e:
-    st.error(f"❌ AI 配置异常: {str(e)}")
-    st.info("请检查 API Key 是否正确，或网络是否可以访问 Google API。")
+    st.error(f"AI 配置失败: {e}")
     st.stop()
 
-# --- 2. 页面美化配置 ---
-st.set_page_config(page_title="Gemini 实时智能研报", layout="wide", page_icon="🍎")
-
+# --- 2. 页面样式 ---
+st.set_page_config(page_title="Gemini 结构化研报终端", layout="wide")
 st.markdown("""
     <style>
-    .main { background-color: #f9fbfd; }
-    .ai-card { background-color: #ffffff; padding: 30px; border-radius: 15px; border-left: 10px solid #4285f4; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-    .metric-pill { background: #e8f0fe; color: #1967d2; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; margin-right: 8px; }
-    .section-head { color: #1a73e8; font-size: 24px; font-weight: bold; margin: 20px 0; border-bottom: 2px solid #e1e4e8; padding-bottom: 10px; }
+    .report-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-top: 4px solid #1a73e8; height: 100%; }
+    .ai-insight-box { background: #f8faff; padding: 15px; border-radius: 8px; border-left: 4px solid #34a853; margin-top: 10px; font-size: 14px; }
+    .section-title { color: #1a237e; font-size: 22px; font-weight: bold; margin: 30px 0 15px 0; border-bottom: 2px solid #eee; padding-bottom: 8px; }
+    .metric-value { font-size: 20px; font-weight: bold; color: #1a73e8; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. 实时数据抓取函数 ---
-def get_clean_name(info, symbol):
-    raw = info.get('longName', info.get('shortName', symbol))
-    clean = re.sub(r"(?i)(Co\.,\s*Ltd\.|Group|Inc\.|Corp\.|Holdings|A-Shares|Class A)", "", raw)
-    cn = "".join(re.findall(r'[\u4e00-\u9fa5]+', clean))
-    return cn if cn else clean.strip()
-
-def fetch_stock_data(code):
+# --- 3. 数据抓取 ---
+def get_stock_data(code):
     symbol = code.strip()
-    # 自动处理 A 股后缀
     if symbol.isdigit():
         symbol_yf = f"{symbol}.SS" if symbol.startswith('6') else f"{symbol}.SZ"
-    else:
-        symbol_yf = symbol
-    
+    else: symbol_yf = symbol
     try:
         stock = yf.Ticker(symbol_yf)
         info = stock.info
-        # 提取给 AI 的“财报指纹”
-        metrics = {
-            "name": get_clean_name(info, symbol),
+        name = info.get('shortName', symbol)
+        # 清洗中文名
+        cn_name = "".join(re.findall(r'[\u4e00-\u9fa5]+', name))
+        return {
+            "name": cn_name if cn_name else name,
             "code": symbol,
             "pe": info.get('trailingPE', 0),
             "roe": info.get('returnOnEquity', 0) * 100,
-            "margin": info.get('grossMargins', 0) * 100,
             "growth": info.get('revenueGrowth', 0) * 100,
-            "div_yield": info.get('dividendYield', 0) * 100,
-            "debt_ratio": info.get('debtToEquity', 0)
+            "margin": info.get('grossMargins', 0) * 100,
+            "debt": info.get('debtToEquity', 0)
         }
-        return metrics
-    except:
-        return None
+    except: return None
 
-# --- 4. 界面布局 ---
-st.title("🍎 Gemini 实时智能投资大脑")
-st.caption("基于 2026 年最新市场数据及 Gemini 1.5 原生逻辑内核")
+# --- 4. 界面逻辑 ---
+st.title("🛡️ Gemini 结构化决策终端")
+st.caption("实时抓取数据 + AI 逻辑建模 + 结构化框架呈现")
 
-with st.sidebar:
-    st.header("🔍 监控台")
-    codes_input = st.text_input("输入对比代码 (逗号分隔)", "600519, 002028, 300750")
-    depth_level = st.radio("AI 分析深度", ["标准逻辑", "深度博弈", "风险扫雷"])
-    go_analyze = st.button("🚀 启动 AI 实时研判")
+user_input = st.sidebar.text_input("代码(逗号分隔)", "600519, 002028")
 
-if go_analyze:
-    codes = [c.strip() for c in codes_input.split(',')]
-    
-    with st.status("正在建立逻辑连接...", expanded=True) as status:
-        st.write("正在抓取全球实时财务数据...")
-        results = [fetch_stock_data(c) for c in codes if fetch_stock_data(c)]
-        
-        if results:
-            st.write("正在将数据指纹喂给 Gemini 神经网络...")
-            
-            # 构建对话 Prompt
+if st.sidebar.button("启动深度分析"):
+    codes = [c.strip() for c in user_input.split(',')]
+    raw_results = [get_stock_data(c) for c in codes if get_stock_data(c)]
+
+    if raw_results:
+        # --- 核心：请求 AI 生成结构化 JSON 结论 ---
+        with st.spinner("Gemini 正在逻辑建模..."):
             prompt = f"""
-            你现在是一名极度理性的顶级投资专家，这是你刚刚收到的实时财务指纹。
-            请根据数据，直接给出你的深度分析。
-            
-            要求：
-            1. 分析维度：请根据这些指标（ROE、PE、营收增速、毛利、负债）判断这些标的的‘护城河’是否稳固。
-            2. 对话感：不要列清单，直接像在跟我聊天一样点评。指出谁是真正的‘现金奶牛’，谁正在‘带病狂奔’。
-            3. 深度级别：{depth_level}。
-            4. 最终断言：在这个组合中，从‘赔率和确定性’平衡来看，你最看好哪一个？
-            
-            实时数据：{str(results)}
+            作为资深分析师，请根据以下数据，为每家公司提供3个核心结论：1.护城河评价，2.增长风险点，3.投资博弈建议。
+            要求：必须以严格的 JSON 格式输出，不要有任何多余解释。格式如下：
+            {{"代码": {{"insight": "一句话护城河", "risk": "一句话风险", "advice": "一句话建议"}}}}
+            数据：{str(raw_results)}
             """
-            
             try:
-                # 调取 Gemini 核心
                 response = model.generate_content(prompt)
-                status.update(label="✅ 分析完成！", state="complete", expanded=False)
-                
-                # --- 5. 渲染 AI 研报 ---
-                st.markdown('<div class="section-head">💡 Gemini 实时深度点评</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="ai-card">{response.text}</div>', unsafe_allow_html=True)
-                
-                # --- 6. 数据可视化 (雷达图) ---
-                st.markdown('<div class="section-head">📊 体质多维对比</div>', unsafe_allow_html=True)
-                categories = ['估值性价比', '盈利能力', '毛利溢价', '增长动力', '稳健程度']
-                fig = go.Figure()
-                for r in results:
-                    # 动态算分
-                    scores = [
-                        max(1, min(10, 50/r['pe']*5 if r['pe']>0 else 2)),
-                        max(1, min(10, r['roe']/3)),
-                        max(1, min(10, r['margin']/5)),
-                        max(1, min(10, r['growth']/5)),
-                        max(1, min(10, 10 - r['debt_ratio']/20))
-                    ]
-                    fig.add_trace(go.Scatterpolar(r=scores, theta=categories, fill='toself', name=r['name']))
-                fig.update_layout(polar=dict(radialaxis=dict(visible=False, range=[0, 10])), height=500)
-                st.plotly_chart(fig, use_container_width=True)
+                # 提取 JSON 字符串
+                json_str = re.search(r'\{.*\}', response.text, re.DOTALL).group()
+                ai_insights = json.loads(json_str)
+            except:
+                ai_insights = {}
 
-            except Exception as e:
-                st.error(f"Gemini API 响应异常: {str(e)}")
-        else:
-            st.error("抓取失败，请检查网络或代码输入。")
+        # --- 第一部分：公司画像卡片 ---
+        st.markdown('<div class="section-title">一、公司基本面画像</div>', unsafe_allow_html=True)
+        cols = st.columns(len(raw_results))
+        for i, r in enumerate(raw_results):
+            with cols[i]:
+                st.markdown(f"""
+                <div class="report-card">
+                    <h3>{r['name']} <small>{r['code']}</small></h3>
+                    <p>ROE: <span class="metric-value">{r['roe']:.1f}%</span></p>
+                    <p>动态PE: <span class="metric-value">{r['pe']:.1f}</span></p>
+                    <div class="ai-insight-box">
+                        <b>AI 核心洞察：</b><br/>{ai_insights.get(r['code'], {}).get('insight', '分析加载中...')}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-# --- 7. 页脚原始数据 ---
-with st.expander("查看底层原始财务指纹"):
-    if 'results' in locals() and results:
-        st.table(pd.DataFrame(results))
+        # --- 第二部分：多维对比 ---
+        st.markdown('<div class="section-title">二、多维度逻辑对比</div>', unsafe_allow_html=True)
+        col_chart, col_table = st.columns([1, 1.2])
+        
+        with col_chart:
+            categories = ['便宜度', '赚钱底气', '增长动力', '稳健性', '毛利水平']
+            fig = go.Figure()
+            for r in raw_results:
+                scores = [
+                    max(1, min(10, 50/r['pe']*5 if r['pe']>0 else 2)),
+                    max(1, min(10, r['roe']/3)),
+                    max(1, min(10, r['growth']/5)),
+                    max(1, min(10, 10 - r['debt']/20)),
+                    max(1, min(10, r['margin']/5))
+                ]
+                fig.add_trace(go.Scatterpolar(r=scores, theta=categories, fill='toself', name=r['name']))
+            fig.update_layout(polar=dict(radialaxis=dict(visible=False, range=[0, 10])), height=400, margin=dict(t=20, b=20))
+            st.plotly_chart(fig, use_container_width=True)
+            
+
+        with col_table:
+            # 这里的表格结合了原始数据和 AI 风险提示
+            table_data = []
+            for r in raw_results:
+                table_data.append({
+                    "名称": r['name'],
+                    "营收增速": f"{r['growth']:.1f}%",
+                    "风险预警 (AI)": ai_insights.get(r['code'], {}).get('risk', '需关注基本面波动')
+                })
+            st.table(pd.DataFrame(table_data))
+
+        # --- 第三部分：最终博弈决策 ---
+        st.markdown('<div class="section-title">三、理性博弈决策建议</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        for i, r in enumerate(raw_results):
+            target_col = c1 if i % 2 == 0 else c2
+            with target_col:
+                st.info(f"**{r['name']} 投资建议：** {ai_insights.get(r['code'], {}).get('advice', '观望为主')}")
+
+    else:
+        st.error("未获取到数据，请检查输入。")
