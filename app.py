@@ -1,33 +1,18 @@
 import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
 import yfinance as yf
-import re
+import pandas as pd
 
-# 1. 页面配置
-st.set_page_config(page_title="Gemini 动态逻辑研报", layout="wide")
+st.set_page_config(page_title="Gemini 选股中枢", layout="wide")
 
-# 样式：专业研报与直观对话的结合
+# 样式：营造“数据实验室”氛围
 st.markdown("""
     <style>
-    .dynamic-report { background-color: #ffffff; padding: 25px; border-radius: 15px; border: 1px solid #e0e6ed; margin-bottom: 25px; }
-    .tag-box { display: flex; gap: 8px; margin-bottom: 15px; }
-    .tag { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; }
-    .tag-blue { background: #e3f2fd; color: #1976d2; }
-    .tag-red { background: #ffebee; color: #c62828; }
-    .tag-green { background: #e8f5e9; color: #2e7d32; }
-    .opinion-header { color: #2c3e50; font-size: 18px; font-weight: bold; margin-bottom: 12px; border-left: 4px solid #1a73e8; padding-left: 10px; }
-    .content-body { line-height: 1.7; color: #444; font-size: 15px; }
+    .ai-prompt-area { background-color: #f8f9fa; padding: 25px; border: 2px solid #4285f4; border-radius: 15px; }
+    .metric-grid { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     </style>
     """, unsafe_allow_html=True)
 
-def get_clean_name(info, symbol):
-    raw = info.get('longName', info.get('shortName', symbol))
-    clean = re.sub(r"(?i)(Co\.,\s*Ltd\.|Group|Inc\.|Corp\.|Holdings|A-Shares|Class A)", "", raw)
-    cn = "".join(re.findall(r'[\u4e00-\u9fa5]+', clean))
-    return cn if cn else clean.strip()
-
-def get_pro_data(code):
+def get_real_data(code):
     symbol = code.strip()
     if symbol.isdigit():
         symbol_yf = f"{symbol}.SS" if symbol.startswith('6') else f"{symbol}.SZ"
@@ -35,94 +20,39 @@ def get_pro_data(code):
     try:
         stock = yf.Ticker(symbol_yf)
         info = stock.info
+        # 提取核心博弈指标
         return {
-            "name": get_clean_name(info, symbol), "code": symbol, 
-            "pe": info.get('trailingPE', 0), "roe": info.get('returnOnEquity', 0) * 100,
-            "margin": info.get('grossMargins', 0) * 100, "growth": info.get('revenueGrowth', 0) * 100,
-            "div": info.get('dividendYield', 0) * 100, "debt": info.get('debtToEquity', 0),
-            "info": info
+            "名称": info.get('shortName', symbol),
+            "代码": symbol,
+            "ROE": f"{info.get('returnOnEquity', 0)*100:.2f}%",
+            "PE(动)": f"{info.get('trailingPE', 0):.2f}",
+            "营收增长": f"{info.get('revenueGrowth', 0)*100:.2f}%",
+            "毛利率": f"{info.get('grossMargins', 0)*100:.2f}%",
+            "现金流": f"{info.get('freeCashflow', 0)/1e8:.2f}亿",
+            "负债率": f"{info.get('debtToEquity', 0):.2f}%"
         }
     except: return None
 
-# --- 核心：多维动态评价引擎 ---
-def generate_dynamic_opinion(r):
-    tags = []
-    opinions = []
+st.title("🧬 Gemini 数据投喂中枢")
+st.write("输入股票代码，我会为你打包一份‘AI 专用博弈清单’。")
+
+codes = st.text_input("输入代码 (逗号分隔)", "600309, 002028")
+
+if st.button("生成 AI 投喂包"):
+    data_list = [get_real_data(c) for c in codes.split(',') if get_real_data(c)]
     
-    # 1. 盈利与护城河判定
-    if r['roe'] > 20 and r['margin'] > 40:
-        tags.append(('<span class="tag tag-green">极强护城河</span>', "属于典型的‘轻资产、高毛利’模式。"))
-        opinions.append(f"其 {r['roe']:.1f}% 的净资产收益率配合高毛利，说明产品极具定价权，基本面处于顶尖行列。")
-    elif r['roe'] > 15:
-        tags.append(('<span class="tag tag-blue">优质白马</span>', "经营效率稳健。"))
-        opinions.append("盈利水平处于 A 股前 10% 梯队，展现了成熟的商业模式。")
-    else:
-        tags.append(('<span class="tag tag-red">效率待提升</span>', "当前赚钱效应一般。"))
-        opinions.append(f"ROE 仅为 {r['roe']:.1f}%，需警惕行业竞争加剧或成本控制压力。")
+    if data_list:
+        # 展示给用户看的数据表
+        st.subheader("📋 实时抓取清单")
+        st.table(pd.DataFrame(data_list))
 
-    # 2. 增长逻辑交叉判定
-    if r['growth'] > 30:
-        opinions.append(f"难得的是，在如此规模下仍保持 {r['growth']:.1f}% 的营收增速，说明正处于强力扩张期。")
-    elif r['growth'] < 0:
-        opinions.append(f"注意到营收增长为负（{r['growth']:.1f}%），这通常暗示行业见顶或份额被蚕食，逻辑已从‘扩张’转向‘防守’。")
-
-    # 3. 估值与性价比
-    if r['pe'] == 0:
-        opinions.append("目前处于亏损状态或数据异常，无法通过 PE 估值，建议关注现金流变化。")
-    elif r['pe'] > 50:
-        opinions.append(f"高达 {r['pe']:.1f} 倍的 PE 说明市场对其未来寄予厚望，但短期安全边际较薄，容错率极低。")
-    elif r['pe'] < 15:
-        opinions.append(f"PE 仅 {r['pe']:.1f} 倍，若非行业基本面反转，目前估值具有极强的‘捡漏’属性。")
-
-    # 4. 股东回报
-    if r['div'] > 3:
-        tags.append(('<span class="tag tag-green">高分红</span>', ""))
-        opinions.append(f"其股息率达到 {r['div']:.2f}%，在震荡市中具备极强的抗跌属性，是优质的防御标的。")
-
-    return "".join([t[0] for t in tags]), " ".join(opinions)
-
-# 3. UI 展示
-st.title("🤖 Gemini 动态逻辑深度研报")
-st.caption("基于实时财报数据进行多维交叉推理，生成非预设化深度观点")
-
-user_input = st.sidebar.text_input("输入自选代码 (逗号分隔)", "600519, 002028, 300750")
-
-if st.sidebar.button("启动深度逻辑分析"):
-    codes = [c.strip() for c in user_input.split(',')]
-    results = [get_pro_data(c) for c in codes if get_pro_data(c)]
-    
-    if results:
-        for r in results:
-            tag_html, opinion_text = generate_dynamic_opinion(r)
-            st.markdown(f"""
-            <div class="dynamic-report">
-                <div class="tag-box">{tag_html}</div>
-                <div class="opinion-header">{r['name']} ({r['code']})：深度逻辑研判</div>
-                <div class="content-body">
-                    {opinion_text}
-                </div>
-                <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:13px; color:#888;">
-                    关键指标：ROE {r['roe']:.1f}% | PE {r['pe']:.1f} | 营收增速 {r['growth']:.1f}% | 资产负债率 {r['debt']:.1f}%
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        # 核心：自动生成的 AI 分析指令（这是接入我的关键）
+        st.subheader("🚀 第三步：请将下方内容发给我")
         
-        # 可视化对比
-        st.subheader("📊 竞争力对撞图")
+        # 构造一个极简且深度的数据指纹
+        prompt = f"我是你的投资助手。请基于以下实时数据，以你的深度理性逻辑，分析这 {len(data_list)} 只股票的护城河优劣、当前的博弈赔率以及潜在风险：\n\n"
+        prompt += str(data_list)
+        prompt += "\n\n要求：不要复述数据，直接给结论。谁是伪增长？谁是真白马？现在买入的确定性高吗？"
         
-        categories = ['便宜程度', '赚钱底气', '增长动力', '稳健程度', '分红回报']
-        fig = go.Figure()
-        for r in results:
-            # 动态计算雷达图分数
-            s = [
-                max(1, min(10, 50/r['pe']*5 if r['pe'] > 0 else 2)),
-                max(1, min(10, r['roe']/3)),
-                max(1, min(10, r['growth']/5)),
-                max(1, min(10, 10 - r['debt']/20)),
-                max(1, min(10, r['div']*2))
-            ]
-            fig.add_trace(go.Scatterpolar(r=s, theta=categories, fill='toself', name=r['name']))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=False, range=[0, 10])), height=450)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.error("无法获取数据，请检查代码。")
+        st.markdown(f'<div class="ai-prompt-area"><code>{prompt}</code></div>', unsafe_allow_html=True)
+        st.info("↑ 复制上面的内容直接粘贴到对话框即可，我会立刻开始分析。")
