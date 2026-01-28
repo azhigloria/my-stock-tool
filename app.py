@@ -8,7 +8,7 @@ st.set_page_config(page_title="散户深度选股笔记", layout="wide")
 
 st.markdown("""
     <style>
-    .report-card { background-color: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-top: 4px solid #4CAF50; margin-bottom: 20px; }
+    .report-card { background-color: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-top: 4px solid #4CAF50; margin-bottom: 20px; text-align: center; }
     .section-title { color: #2c3e50; font-size: 24px; font-weight: bold; margin: 25px 0 15px 0; border-bottom: 2px solid #eee; padding-bottom: 5px; }
     .recommend-card { background-color: #fcfdfc; padding: 15px; border-radius: 10px; border: 1px solid #eef2ee; height: 100%; }
     .highlight-text { color: #ff4b4b; font-weight: bold; }
@@ -71,15 +71,13 @@ st.sidebar.header("📝 输入对比组合")
 user_input = st.sidebar.text_input("代码(如: 600309, 600426, 002409)", "600309, 600426, 002409")
 
 if st.sidebar.button("生成深度研报"):
-    # 修复了这里的赋值逻辑
     codes_list = [c.strip() for c in user_input.split(',')]
-    results = [get_pro_data(c) for c in codes_list]
-    results = [r for r in results if r is not None]
+    results = []
+    for c in codes_list:
+        data = get_pro_data(c)
+        if data:
+            results.append(data)
     
     if results:
         # 模块 1: 画像
-        st.markdown('<div class="section-title">1. 公司画像与核心竞争力</div>', unsafe_allow_html=True)
-        cols = st.columns(len(results))
-        for i, r in enumerate(results):
-            with cols[i]:
-                st.markdown(f'<div class="report-card">**{r["name"]} ({r["code"]})**<br/><small>{r["adv"]}</small></div>
+        st.markdown('<div class="section-title">
