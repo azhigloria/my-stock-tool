@@ -57,4 +57,52 @@ with st.sidebar:
 
 if analyze_btn:
     codes = [c.strip() for c in user_input.split(',')]
-    raw_results = [get_stock_data(c) for c in codes if get_stock_data(
+    raw_results = [get_stock_data(c) for c in codes if get_stock_data(c)]
+
+    if raw_results:
+        with st.spinner("AI 正在解析数据并汉化名称..."):
+            # 核心 Prompt：强制要求中文名、极简表格、短句结论
+            prompt = f"""
+            你现在是极简主义选股专家。请根据以下数据，参考《分析框架》输出报告。
+            
+            ⚠️ 重要要求：
+            1. 名称汉化：必须根据代码将公司名转换为准确的【中文简称】（如：贵州茅台）。
+            2. 字数控制：严禁长段落。多用表格和 Emoji。
+            
+            ### 报告框架：
+            一、公司画像：使用Markdown表格 [公司中文名 | 核心标签 | 一句话护城河]。
+            二、多维对撞：对比各家，列出 [✅机会点] 和 [❌风险点]（每项限20字）。
+            三、理性结论：直接给出针对【稳健派】和【进攻派】的唯一首选，并给出理由。
+            
+            待分析数据：{str(raw_results)}
+            """
+            
+            try:
+                response = model.generate_content(prompt)
+                
+                # --- 视觉对比图 ---
+                st.subheader("📊 竞争力多维对撞")
+                categories = ['性价比', '盈利能力', '溢价力', '增长动力', '稳健性']
+                fig = go.Figure()
+                for r in raw_results:
+                    scores = [
+                        max(1, min(10, 50/r['pe']*5 if r['pe']>0 else 2)),
+                        max(1, min(10, r['roe']/3)),
+                        max(1, min(10, r['margin']/5)),
+                        max(1, min(10, r['growth']/5)),
+                        max(1, min(10, 10 - r['debt']/20))
+                    ]
+                    fig.add_trace(go.Scatterpolar(r=scores, theta=categories, fill='toself', name=r['code']))
+                fig.update_layout(polar=dict(radialaxis=dict(visible=False, range=[0, 10])), height=400)
+                st.plotly_chart(fig, use_container_width=True)
+
+                # --- AI 结构化报告 ---
+                st.markdown("---")
+                st.markdown('<div class="report-container">', unsafe_allow_html=True)
+                st.markdown(response.text)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            except Exception as e:
+                st.error(f"AI 生成失败: {e}")
+    else:
+        st.error("无法抓取数据，请检查代码。")
