@@ -6,7 +6,7 @@ import yfinance as yf
 # 1. 页面配置
 st.set_page_config(page_title="散户深度选股笔记", layout="wide")
 
-# 2. 自定义样式：打造“深度研报”既视感
+# 2. 自定义样式
 st.markdown("""
     <style>
     .report-card { background-color: #ffffff; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 25px; border-top: 5px solid #4CAF50; }
@@ -27,6 +27,7 @@ def get_pro_data(code):
     pure_code = "".join(filter(str.isdigit, symbol))
     if symbol.isdigit():
         symbol = f"{symbol}.SS" if symbol.startswith('6') else f"{symbol}.SZ"
+    
     try:
         stock = yf.Ticker(symbol)
         info = stock.info
@@ -41,14 +42,14 @@ def get_pro_data(code):
 
         # 评分逻辑
         scores = [
-            max(1, min(10, 50/pe*5 if pe>0 else 2)), 
+            max(1, min(10, 50/pe*5 if pe > 0 else 2)), 
             max(1, min(10, roe/3)), 
             max(1, min(10, div*200)), 
             max(1, min(10, 10 - debt/20)), 
             max(1, min(10, growth*8))
         ]
         
-        # 深度逻辑模块化
+        # 深度逻辑生成
         if roe > 15:
             logic = "典型的“白马股”。依靠极强的品牌力或成本护城河实现超额利润。"
             advantage = "经营极其稳健，抗风险能力强，分红相对稳定，是时间的朋友。"
@@ -56,9 +57,20 @@ def get_pro_data(code):
             logic = "典型的“周期/成长股”。业绩受行业景气度影响大，需关注国产替代或扩产节奏。"
             advantage = "资产质量尚可，管理层执行力强，正处于行业地位爬坡期。"
 
-        risk = "盘子较大，股价受全球宏观经济和外资流动影响显著。" if pe > 25 else "行业竞争加剧可能导致毛利承压，需关注新产能释放进度。"
+        risk = "盘子较大，股价受全球宏观经济影响显著。" if pe > 25 else "行业竞争加剧可能导致毛利承压，需关注新产能释放。"
 
         return {
             "name": name, "code": pure_code, "pe": pe, "roe": roe, "div": div, "growth": growth,
             "scores": scores, "logic": logic, "advantage": advantage, "risk": risk
         }
+    except Exception as e:
+        return None
+
+st.title("🍎 深度研报对比：让投资回归理性")
+
+# 侧边栏
+st.sidebar.header("📝 输入对比组合")
+input_codes = st.sidebar.text_input("代码(如: 600309, 600426, 002409)", "600309, 600426, 002409")
+
+if st.sidebar.button("生成深度研报"):
+    codes =
