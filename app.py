@@ -7,12 +7,17 @@ import re
 
 # --- 1. 核心安全配置：从 Secrets 读取 API KEY ---
 try:
-    # 确保你已在 Streamlit Cloud 的 Secrets 中填入 GEMINI_API_KEY = "你的KEY"
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    # 修复 404 错误的关键：使用全名或 latest 后缀
+    # gemini-1.5-flash-latest 是目前最稳定的指向
+    model = genai.GenerativeModel(model_name='gemini-1.5-flash-latest')
+    
+    # 测试一下连接（可选）
+    # response = model.generate_content("test") 
 except Exception as e:
-    st.error("❌ 未检测到 API Key。请在 Streamlit 控制台的 Secrets 中配置 GEMINI_API_KEY。")
+    st.error(f"❌ AI 配置异常: {str(e)}")
     st.stop()
 
 # --- 2. 页面美化配置 ---
