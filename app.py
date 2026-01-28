@@ -60,7 +60,7 @@ if analyze_btn:
     raw_results = [get_stock_data(c) for c in codes if get_stock_data(c)]
 
     if raw_results:
-        with st.spinner("AI 正在解析数据并汉化名称..."):
+        with st.spinner("擂台搭建中..."):
             # 核心 Prompt：强制要求中文名、极简表格、短句结论
             prompt = f"""
             你现在是极简主义选股专家。请根据以下数据，参考《分析框架》输出报告。
