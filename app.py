@@ -56,7 +56,7 @@ def get_stock_data(code):
 
 # --- 4. 主界面布局 ---
 st.title("🍎 自选股大比拼")
-st.caption("实时抓取财报数据 · Gemini 逻辑建模 · 理性决策辅助")
+st.caption("实时抓取财报数据 · 逻辑建模 · 理性决策辅助")
 
 with st.sidebar:
     st.header("🔍 擂台配置")
@@ -99,7 +99,7 @@ if analyze_btn:
         
 
         # --- B. AI 结构化报告模块 ---
-        with st.spinner("Gemini 正在逻辑建模并撰写研报..."):
+        with st.spinner("正在逻辑建模并撰写研报..."):
             # 强化后的 Prompt，融入了汉化和极简逻辑
             prompt = f"""
             你现在是极简主义选股专家。请根据以下实时财务数据，参考《分析框架》输出一份深度报告。
@@ -123,7 +123,7 @@ if analyze_btn:
                 response = model.generate_content(prompt)
                 
                 st.markdown("---")
-                st.markdown("### 🤖 Gemini 深度研判报告")
+                st.markdown("### 🤖 深度研判报告")
                 st.markdown(f'<div class="report-container">{response.text}</div>', unsafe_allow_html=True)
                 
             except Exception as e:
